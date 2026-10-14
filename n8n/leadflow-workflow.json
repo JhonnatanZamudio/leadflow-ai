@@ -1,0 +1,190 @@
+{
+  "name": "LeadFlow AI - inbound lead triage",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Talk to us",
+        "formDescription": "Tell us about your project and we will get back to you within one business day.",
+        "formFields": {
+          "values": [
+            {"fieldLabel": "Name", "requiredField": true},
+            {"fieldLabel": "Email", "fieldType": "email", "requiredField": true},
+            {"fieldLabel": "Company"},
+            {"fieldLabel": "Phone"},
+            {"fieldLabel": "Message", "fieldType": "textarea", "requiredField": true}
+          ]
+        },
+        "options": {}
+      },
+      "id": "3f1c2a10-0001-4c5e-9a10-000000000001",
+      "name": "Contact form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [0, 300],
+      "webhookId": "3f1c2a10-0001-4c5e-9a10-0000000000aa"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://leadflow:8000/leads",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: $json.Name, email: $json.Email, company: $json.Company, phone: $json.Phone, message: $json.Message, source: 'web_form', received_at: $json.submittedAt }) }}",
+        "options": {"response": {"response": {"neverError": true}}, "timeout": 60000}
+      },
+      "id": "3f1c2a10-0002-4c5e-9a10-000000000002",
+      "name": "Classify lead (LeadFlow API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2},
+          "conditions": [{"id": "3f1c2a10-0003-4c5e-9a10-0000000000c1", "leftValue": "={{ $json.tier }}", "rightValue": "hot", "operator": {"type": "string", "operation": "equals"}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3f1c2a10-0003-4c5e-9a10-000000000003",
+      "name": "Is hot?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {"__rl": true, "value": "REPLACE_WITH_SHEET_ID", "mode": "id"},
+        "sheetName": {"__rl": true, "value": "Leads", "mode": "name"},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "received_at": "={{ $now.toISO() }}",
+            "name": "={{ $json.name }}",
+            "email": "={{ $json.email }}",
+            "company": "={{ $json.company }}",
+            "status": "={{ $json.status }}",
+            "tier": "={{ $json.tier }}",
+            "route": "={{ $json.route }}",
+            "intent": "={{ $json.classification?.intent }}",
+            "fit_score": "={{ $json.classification?.fit_score }}",
+            "summary": "={{ $json.classification?.summary }}",
+            "suggested_first_reply": "={{ $json.classification?.suggested_first_reply }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "received_at", "displayName": "received_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "name", "displayName": "name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "email", "displayName": "email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "company", "displayName": "company", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "status", "displayName": "status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "tier", "displayName": "tier", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "route", "displayName": "route", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "intent", "displayName": "intent", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "fit_score", "displayName": "fit_score", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "summary", "displayName": "summary", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {
+              "id": "suggested_first_reply",
+              "displayName": "suggested_first_reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3f1c2a10-0004-4c5e-9a10-000000000004",
+      "name": "Append hot lead to sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [760, 160],
+      "credentials": {"googleSheetsOAuth2Api": {"id": "REPLACE_ME", "name": "Google Sheets account"}}
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {"__rl": true, "value": "#sales-hot-leads", "mode": "name"},
+        "text": "=*Hot lead* - {{ $json.company || $json.name }} (fit {{ $json.classification.fit_score }})\n{{ $json.classification.summary }}\n{{ $json.email }}\n\n*Suggested first reply:*\n{{ $json.classification.suggested_first_reply }}",
+        "otherOptions": {}
+      },
+      "id": "3f1c2a10-0005-4c5e-9a10-000000000005",
+      "name": "Notify sales on Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [760, 340],
+      "credentials": {"slackApi": {"id": "REPLACE_ME", "name": "Slack account"}}
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {"__rl": true, "value": "REPLACE_WITH_SHEET_ID", "mode": "id"},
+        "sheetName": {"__rl": true, "value": "Leads", "mode": "name"},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "received_at": "={{ $now.toISO() }}",
+            "name": "={{ $json.name }}",
+            "email": "={{ $json.email }}",
+            "company": "={{ $json.company }}",
+            "status": "={{ $json.status }}",
+            "tier": "={{ $json.tier }}",
+            "route": "={{ $json.route }}",
+            "intent": "={{ $json.classification?.intent }}",
+            "fit_score": "={{ $json.classification?.fit_score }}",
+            "summary": "={{ $json.classification?.summary }}",
+            "suggested_first_reply": "={{ $json.classification?.suggested_first_reply }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "received_at", "displayName": "received_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "name", "displayName": "name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "email", "displayName": "email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "company", "displayName": "company", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "status", "displayName": "status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "tier", "displayName": "tier", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "route", "displayName": "route", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "intent", "displayName": "intent", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "fit_score", "displayName": "fit_score", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {"id": "summary", "displayName": "summary", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true},
+            {
+              "id": "suggested_first_reply",
+              "displayName": "suggested_first_reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3f1c2a10-0006-4c5e-9a10-000000000006",
+      "name": "Append lead to sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [760, 520],
+      "credentials": {"googleSheetsOAuth2Api": {"id": "REPLACE_ME", "name": "Google Sheets account"}}
+    }
+  ],
+  "connections": {
+    "Contact form": {"main": [[{"node": "Classify lead (LeadFlow API)", "type": "main", "index": 0}]]},
+    "Classify lead (LeadFlow API)": {"main": [[{"node": "Is hot?", "type": "main", "index": 0}]]},
+    "Is hot?": {
+      "main": [
+        [{"node": "Append hot lead to sheet", "type": "main", "index": 0}, {"node": "Notify sales on Slack", "type": "main", "index": 0}],
+        [{"node": "Append lead to sheet", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {"executionOrder": "v1"},
+  "active": false,
+  "meta": {"templateCredsSetupCompleted": false},
+  "tags": []
+}

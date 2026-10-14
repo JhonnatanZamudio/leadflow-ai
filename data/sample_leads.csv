@@ -1,0 +1,6 @@
+name,email,company,phone,source,received_at,message
+Marta Ibáñez,marta@rio-claro-textiles.example,Río Claro Textiles,311 555 0177,web_form,2026-10-13T13:00:00-05:00,"Queremos automatizar el registro de pedidos de nuestros distribuidores en el CRM. Presupuesto aproximado USD 6,000. ¿Pueden cotizar?"
+Kevin Shaw,kevin@ironleaf-supply.example,Ironleaf Supply,,email,2026-10-13T13:05:00-05:00,"Hi, could you send pricing for a workflow that routes supplier emails to the right team in our CRM?"
+Lina Ospina,lina.ospina@correo.example,,,web_form,,"Adjunto mi hoja de vida para cualquier vacante en el área de operaciones."
+Spam Bot,promo@mailinator.com,,,web_form,,"You have won! Click here to claim your crypto reward now."
+Bad Email,not-an-email,,,web_form,,"Esto no debería llegar al modelo porque el correo es inválido."
